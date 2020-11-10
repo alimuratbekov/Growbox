@@ -14,7 +14,9 @@
 #define LED_MOSFET_PIN 12
 #define PUMP_BTN_PIN 4
 #define PUMP_MOSFET_PIN 13
-#define LDR_PIN A0
+#define SM_SENSOR A0
+#define LDR_PIN A1
+
 iarduino_RTC time(RTC_DS1302, 5, 7, 6);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -61,6 +63,9 @@ bool pump_mosfet_flag = false;
 bool pump_active = false;
 long long last_pump_activation = 0;
 int watering_time = 3000;
+const int airValue = 620;
+const int waterValue = 310;
+const int soil_moisture_threshold = 30;
 
 void loop() {
   handleLedButton();
@@ -127,6 +132,12 @@ void activatePump() {
   digitalWrite(PUMP_MOSFET_PIN, pump_mosfet_flag);
 }
 
+// функция для получения значения почвы от 0 до 100%
+int getSoilMoisture() {
+  int val = analogRead(A0);
+  return map(val, airValue, waterValue, 0, 100);
+}
+
 // функция отображения текущего состояния насоса на дисплее
 void displayPumpState(bool pump_on) {
   String pump_state;
@@ -147,6 +158,14 @@ void timingLed(int h, int m, int s) {
   else if (h == day_hour && m == day_minute && s == day_second) {
     led_mosfet_flag = false;
     digitalWrite(LED_MOSFET_PIN, led_mosfet_flag);
+  }
+}
+
+void timingPump(int h, int m, int s) {
+  if (h % 4 == 0 && m == 0 && s == 0) {
+    int val = getSoilMoisture();
+    if (val < soil_moisture_threshold)
+      activatePump();
   }
 }
 
