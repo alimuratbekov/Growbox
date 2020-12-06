@@ -11,11 +11,10 @@
 // CLK - 7
 
 #define LED_BTN_PIN 2
-#define LED_MOSFET_PIN 12
+#define LED_MOSFET_PIN 11
 #define PUMP_BTN_PIN 4
-#define PUMP_MOSFET_PIN 13
-#define SM_SENSOR A0
-#define LDR_PIN A1
+#define PUMP_MOSFET_PIN 12
+#define LDR_PIN A0
 
 iarduino_RTC time(RTC_DS1302, 5, 7, 6);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -31,7 +30,7 @@ void setup() {
 
   // инициализируем RTC-модуль
   time.begin();
-  time.settime(50, 59, 21, 28, 9, 20, 1);
+  //time.settime(0, 0, 23, 5, 12, 20, 6);
 
   // инициализируем LCD
   lcd.init();
@@ -54,26 +53,24 @@ const int day_second = 0;
 const int night_hour = 22;
 const int night_minute = 0;
 const int night_second = 0;
-const int ldr_threshold = 350;
+const int ldr_threshold = 300;
 long long last_led_switch = 0;
 int led_waiting_time = 3000;
 
 // переменные для управления транзистором насоса
 bool pump_mosfet_flag = false;
-bool pump_active = false;
 long long last_pump_activation = 0;
 int watering_time = 3000;
-const int airValue = 620;
-const int waterValue = 310;
-const int soil_moisture_threshold = 30;
+const int pump_activation_hour = 16;
+const int pump_activation_minute = 0;
+const int pump_activation_second = 0;
 
 void loop() {
   handleLedButton();
-  if (pump_active == true) {
-    if (millis() - last_pump_activation == watering_time) {
+  if (pump_mosfet_flag == true) {
+    if (millis() - last_pump_activation >= watering_time) {
       pump_mosfet_flag = false;
       digitalWrite(PUMP_MOSFET_PIN, pump_mosfet_flag);
-      pump_active = false;
     }
   }
   else {
@@ -82,6 +79,7 @@ void loop() {
   if (millis()%100 == 0) {
     displayTime();
     timingLed(time.Hours, time.minutes, time.seconds);
+    timingPump(time.Hours, time.minutes, time.seconds);
     displayLedState(led_mosfet_flag);
     displayPumpState(pump_mosfet_flag);
   }
@@ -126,16 +124,9 @@ void handlePumpButton() {
 
 // функция активации насоса
 void activatePump() {
-  pump_active = true;
   last_pump_activation = millis();
   pump_mosfet_flag = true;
   digitalWrite(PUMP_MOSFET_PIN, pump_mosfet_flag);
-}
-
-// функция для получения значения почвы от 0 до 100%
-int getSoilMoisture() {
-  int val = analogRead(A0);
-  return map(val, airValue, waterValue, 0, 100);
 }
 
 // функция отображения текущего состояния насоса на дисплее
@@ -162,10 +153,8 @@ void timingLed(int h, int m, int s) {
 }
 
 void timingPump(int h, int m, int s) {
-  if (h % 4 == 0 && m == 0 && s == 0) {
-    int val = getSoilMoisture();
-    if (val < soil_moisture_threshold)
-      activatePump();
+  if (h == pump_activation_hour && m == pump_activation_minute && s == pump_activation_second && pump_mosfet_flag == false) {
+    activatePump();
   }
 }
 
